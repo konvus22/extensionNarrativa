@@ -184,6 +184,16 @@
       font-size: 10px;
       color: #9ca3af;
     }
+    .filter-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      color: var(--text-soft);
+      margin: 4px 0 8px;
+    }
+    .filter-row label { font-weight: 500; }
+    .filter-row select { max-width: 170px; }
     button {
       border: none;
       cursor: pointer;
@@ -315,6 +325,62 @@
       overflow-y: auto;
       font-size: 11px;
     }
+    .feed-editor .status { margin-top: 2px; }
+    .feed-list {
+      max-height: 210px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding-right: 2px;
+    }
+    .feed-item {
+      border: 1px solid rgba(51,65,85,0.9);
+      border-radius: 12px;
+      padding: 7px 9px;
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      background: radial-gradient(circle at top left, rgba(59,130,246,0.12), rgba(15,23,42,0.95));
+    }
+    .feed-info {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      font-size: 11px;
+      flex: 1;
+      min-width: 0;
+    }
+    .feed-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: #e2e8f0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .feed-url {
+      font-size: 10px;
+      color: var(--text-soft);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .feed-meta {
+      font-size: 10px;
+      color: #94a3b8;
+    }
+    .feed-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .feed-empty {
+      font-size: 11px;
+      color: var(--text-soft);
+      text-align: center;
+      padding: 12px 0;
+    }
     .source-item { margin-bottom: 4px; }
     .source-item strong { color: #e5e7eb; }
     .source-item span { color: #6b7280; }
@@ -372,12 +438,38 @@
         </div>
       </div>
       <div class="status" id="promptStatus"></div>
+      <div class="filter-row">
+        <label for="promptFilter">Filtrar por categoría:</label>
+        <select id="promptFilter">
+          <option value="Todas">Todas</option>
+          <option value="AMC">AMC</option>
+          <option value="BoxOffice">Box Office</option>
+          <option value="Otros">Otros</option>
+        </select>
+      </div>
       <div class="prompt-list" id="promptList"></div>
     </div>
 
     <div id="panel-feeds" class="panel">
+      <div class="card feed-editor">
+        <div class="prompt-editor-title">Gestiona tus fuentes</div>
+        <div class="field-row">
+          <input id="feedLabel" type="text" placeholder="Nombre visible de la fuente" />
+        </div>
+        <div class="field-row">
+          <input id="feedUrl" type="text" placeholder="URL RSS/JSON" />
+        </div>
+        <div class="field-row">
+          <select id="feedType">
+            <option value="rss">RSS / Atom</option>
+            <option value="stocktwits">Stocktwits</option>
+          </select>
+          <button id="saveFeed" class="btn-primary btn-small">Guardar fuente</button>
+        </div>
+        <div class="status" id="feedFormStatus"></div>
+      </div>
       <div class="card">
-        <div class="sources" id="sourcesList"></div>
+        <div class="feed-list" id="feedList"></div>
       </div>
       <button id="downloadUnified" class="btn-full btn-outline">⬇️ Descargar unified.json</button>
       <div class="status" id="feedsStatus"></div>

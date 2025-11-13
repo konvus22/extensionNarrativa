@@ -24,8 +24,10 @@ const promptContentEl = document.getElementById("promptContent");
 const savePromptBtn = document.getElementById("savePrompt");
 const promptStatusEl = document.getElementById("promptStatus");
 const promptListEl = document.getElementById("promptList");
+const promptFilterEl = document.getElementById("promptFilter");
 
 let editingId = null;
+let promptsCache = [];
 
 function setPromptStatus(msg, type = "") {
   promptStatusEl.textContent = msg || "";
@@ -51,11 +53,15 @@ function setStorage(prompts) {
 }
 
 async function loadPrompts() {
-  const prompts = await getStorage();
-  renderPromptList(prompts);
+  promptsCache = await getStorage();
+  renderPromptList();
 }
 
-function renderPromptList(prompts) {
+function renderPromptList() {
+  const filterValue = promptFilterEl ? (promptFilterEl.value || "Todas") : "Todas";
+  const prompts = filterValue === "Todas"
+    ? promptsCache
+    : promptsCache.filter(p => (p.category || "AMC") === filterValue);
   if (!prompts.length) {
     promptListEl.innerHTML = '<div style="font-size:11px; color:#9ca3af;">Aún no hay prompts guardados.</div>';
     return;
@@ -113,10 +119,9 @@ function renderPromptList(prompts) {
     btn.addEventListener("click", async (ev) => {
       ev.stopPropagation();
       const id = ev.currentTarget.closest(".prompt-item").dataset.id;
-      let prompts = await getStorage();
-      prompts = prompts.filter(x => x.id !== id);
-      await setStorage(prompts);
-      renderPromptList(prompts);
+      promptsCache = promptsCache.filter(x => x.id !== id);
+      await setStorage(promptsCache);
+      renderPromptList();
       setPromptStatus("Prompt eliminado.", "ok");
       if (editingId === id) {
         editingId = null;
@@ -138,13 +143,15 @@ savePromptBtn.addEventListener("click", async () => {
   let prompts = await getStorage();
   if (editingId) {
     prompts = prompts.map(p => p.id === editingId ? { ...p, title, category, content } : p);
-    await setStorage(prompts);
+    promptsCache = prompts;
+    await setStorage(promptsCache);
     setPromptStatus("Prompt actualizado.", "ok");
     editingId = null;
   } else {
     const id = generateId();
     prompts.push({ id, title, category, content });
-    await setStorage(prompts);
+    promptsCache = prompts;
+    await setStorage(promptsCache);
     setPromptStatus("Prompt guardado.", "ok");
   }
   promptTitleEl.value = "";
@@ -152,87 +159,167 @@ savePromptBtn.addEventListener("click", async () => {
   loadPrompts();
 });
 
+if (promptFilterEl) {
+  promptFilterEl.addEventListener("change", renderPromptList);
+}
+
 // ---- Feeds → unified.json ----
 const HOURS_WINDOW = 48;
+const defaultFeeds = [
+  { id: "burry", label: "Twitter user @michaeljburry", url: "https://rss.app/feeds/MrNJDVJXThMoAUi4.xml", type: "rss" },
+  { id: "freeWyckoffs", label: "Twitter user @FreeWyckoffs", url: "https://rss.app/feeds/aUjc1LFb7ALQjZgm.xml", type: "rss" },
+  { id: "btcTwitter", label: "Twitter BTC", url: "https://rss.app/feeds/7CnV2gocDQVCoUfL.xml", type: "rss" },
+  { id: "twitterGeneral", label: "Twitter general", url: "https://rss.app/feeds/QBvaHwCXMLPRP4aR.xml", type: "rss" },
+  { id: "unusual_whales", label: "Twitter user @unusual_whales", url: "https://rss.app/feeds/TdqeTz9R3qJumhZJ.xml", type: "rss" },
+  { id: "mario_nawfal", label: "Twitter user @MarioNawfal", url: "https://rss.app/feeds/MtTou8GWSuoxgTYu.xml", type: "rss" },
+  { id: "amcstock_main", label: "Reddit r/AMCStock", url: "https://www.reddit.com/r/AMCStock/new/.rss", type: "rss" },
+  { id: "amcstock_alt", label: "Reddit r/amcstock", url: "https://www.reddit.com/r/amcstock/new/.rss", type: "rss" },
+  { id: "superstonk", label: "Reddit r/Superstonk", url: "https://www.reddit.com/r/Superstonk/new/.rss", type: "rss" },
+  { id: "boxoffice_top", label: "Reddit r/boxoffice (top, week)", url: "https://www.reddit.com/r/boxoffice/top/.rss?t=week", type: "rss" },
+  { id: "boxoffice_latest", label: "Reddit r/boxoffice (new, últimas 48h)", url: "https://www.reddit.com/r/boxoffice/new/.rss", type: "rss" },
+  { id: "stocktwits_amc", label: "Stocktwits AMC", url: "https://api.stocktwits.com/api/2/streams/symbol/AMC.json", type: "stocktwits" }
+];
 
-const feedsSources = {
-  burry: {
-    label: "Twitter user @michaeljburry",
-    url: "https://rss.app/feeds/MrNJDVJXThMoAUi4.xml",
-    type: "rss"
-  },
-  freeWyckoffs: {
-    label: "Twitter user @FreeWyckoffs",
-    url: "https://rss.app/feeds/aUjc1LFb7ALQjZgm.xml",
-    type: "rss"
-  },
-  btcTwitter: {
-    label: "Twitter BTC",
-    url: "https://rss.app/feeds/7CnV2gocDQVCoUfL.xml",
-    type: "rss"
-  },
-  twitterGeneral: {
-    label: "Twitter general",
-    url: "https://rss.app/feeds/QBvaHwCXMLPRP4aR.xml",
-    type: "rss"
-  },
-  unusual_whales: {
-    label: "Twitter user @unusual_whales",
-    url: "https://rss.app/feeds/TdqeTz9R3qJumhZJ.xml",
-    type: "rss"
-  },
-  mario_nawfal: {
-    label: "Twitter user @MarioNawfal",
-    url: "https://rss.app/feeds/MtTou8GWSuoxgTYu.xml",
-    type: "rss"
-  },
-  amcstock_main: {
-    label: "Reddit r/AMCStock",
-    url: "https://www.reddit.com/r/AMCStock/new/.rss",
-    type: "rss"
-  },
-  amcstock_alt: {
-    label: "Reddit r/amcstock",
-    url: "https://www.reddit.com/r/amcstock/new/.rss",
-    type: "rss"
-  },
-  superstonk: {
-    label: "Reddit r/Superstonk",
-    url: "https://www.reddit.com/r/Superstonk/new/.rss",
-    type: "rss"
-  },
-  boxoffice_top: {
-    label: "Reddit r/boxoffice (top, week)",
-    url: "https://www.reddit.com/r/boxoffice/top/.rss?t=week",
-    type: "rss"
-  },
-  boxoffice_latest: {
-    label: "Reddit r/boxoffice (new, últimas 48h)",
-    url: "https://www.reddit.com/r/boxoffice/new/.rss",
-    type: "rss"
-  },
-  stocktwits_amc: {
-    label: "Stocktwits AMC",
-    url: "https://api.stocktwits.com/api/2/streams/symbol/AMC.json",
-    type: "stocktwits"
-  }
-};
+const FEEDS_STORAGE_KEY = "feedsSources";
 
-const sourcesListEl = document.getElementById("sourcesList");
+const feedLabelEl = document.getElementById("feedLabel");
+const feedUrlEl = document.getElementById("feedUrl");
+const feedTypeEl = document.getElementById("feedType");
+const saveFeedBtn = document.getElementById("saveFeed");
+const feedFormStatusEl = document.getElementById("feedFormStatus");
+const feedListEl = document.getElementById("feedList");
 const feedsStatusEl = document.getElementById("feedsStatus");
 const btnUnified = document.getElementById("downloadUnified");
+
+let feedsCache = [];
+let editingFeedId = null;
 
 function setFeedsStatus(msg, type="") {
   feedsStatusEl.textContent = msg || "";
   feedsStatusEl.className = "status " + (type || "");
 }
 
-function renderSourcesList() {
-  const entries = Object.entries(feedsSources);
-  sourcesListEl.innerHTML = entries.map(([key, s]) => {
-    return `<div class="source-item"><strong>${s.label}</strong><br><span>${s.url}</span></div>`;
-  }).join("");
+function setFeedFormStatus(msg, type="") {
+  feedFormStatusEl.textContent = msg || "";
+  feedFormStatusEl.className = "status " + (type || "");
 }
+
+function generateFeedId() {
+  return "feed_" + Date.now() + "_" + Math.floor(Math.random() * 1e6);
+}
+
+function getFeedsStorage() {
+  return new Promise(resolve => {
+    chrome.storage.local.get([FEEDS_STORAGE_KEY], data => {
+      resolve(data[FEEDS_STORAGE_KEY] || []);
+    });
+  });
+}
+
+function setFeedsStorage(feeds) {
+  return new Promise(resolve => {
+    chrome.storage.local.set({ [FEEDS_STORAGE_KEY]: feeds }, () => resolve());
+  });
+}
+
+async function loadFeeds() {
+  let feeds = await getFeedsStorage();
+  if (!feeds.length) {
+    feeds = defaultFeeds.map(f => ({ ...f }));
+    await setFeedsStorage(feeds);
+  }
+  feedsCache = feeds;
+  renderFeedList();
+}
+
+function renderFeedList() {
+  if (!feedsCache.length) {
+    feedListEl.innerHTML = '<div class="feed-empty">No hay fuentes configuradas.</div>';
+    return;
+  }
+  feedListEl.innerHTML = feedsCache.map(feed => `
+    <div class="feed-item" data-id="${feed.id}">
+      <div class="feed-info">
+        <div class="feed-title">${feed.label || "(sin nombre)"}</div>
+        <div class="feed-url" title="${feed.url}">${feed.url}</div>
+        <div class="feed-meta">Tipo: ${feed.type === "stocktwits" ? "Stocktwits" : "RSS"}</div>
+      </div>
+      <div class="feed-actions">
+        <button class="icon-btn edit-feed" title="Editar">✏️</button>
+        <button class="icon-btn delete-feed" title="Eliminar">🗑️</button>
+      </div>
+    </div>
+  `).join("");
+
+  feedListEl.querySelectorAll(".edit-feed").forEach(btn => {
+    btn.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      const id = ev.currentTarget.closest(".feed-item").dataset.id;
+      startFeedEdit(id);
+    });
+  });
+
+  feedListEl.querySelectorAll(".delete-feed").forEach(btn => {
+    btn.addEventListener("click", async (ev) => {
+      ev.stopPropagation();
+      const id = ev.currentTarget.closest(".feed-item").dataset.id;
+      feedsCache = feedsCache.filter(feed => feed.id !== id);
+      await setFeedsStorage(feedsCache);
+      renderFeedList();
+      if (editingFeedId === id) {
+        resetFeedForm();
+      }
+      setFeedFormStatus("Fuente eliminada.", "ok");
+    });
+  });
+}
+
+function startFeedEdit(id) {
+  const feed = feedsCache.find(f => f.id === id);
+  if (!feed) return;
+  editingFeedId = id;
+  feedLabelEl.value = feed.label || "";
+  feedUrlEl.value = feed.url || "";
+  feedTypeEl.value = feed.type || "rss";
+  setFeedFormStatus("Editando fuente...", "");
+}
+
+function resetFeedForm() {
+  editingFeedId = null;
+  feedLabelEl.value = "";
+  feedUrlEl.value = "";
+  feedTypeEl.value = "rss";
+}
+
+saveFeedBtn.addEventListener("click", async () => {
+  const label = (feedLabelEl.value || "").trim();
+  const url = (feedUrlEl.value || "").trim();
+  const type = feedTypeEl.value || "rss";
+
+  if (!label || !url) {
+    setFeedFormStatus("Nombre y URL son obligatorios.", "error");
+    return;
+  }
+  try {
+    new URL(url);
+  } catch (err) {
+    setFeedFormStatus("La URL no es válida.", "error");
+    return;
+  }
+
+  if (editingFeedId) {
+    feedsCache = feedsCache.map(feed => feed.id === editingFeedId ? { ...feed, label, url, type } : feed);
+    await setFeedsStorage(feedsCache);
+    setFeedFormStatus("Fuente actualizada.", "ok");
+    resetFeedForm();
+  } else {
+    feedsCache = [...feedsCache, { id: generateFeedId(), label, url, type }];
+    await setFeedsStorage(feedsCache);
+    setFeedFormStatus("Fuente guardada.", "ok");
+    resetFeedForm();
+  }
+  renderFeedList();
+});
 
 function parseDateFallback(str) {
   if (!str) return null;
@@ -247,15 +334,14 @@ function withinWindow(date) {
   return date.getTime() >= cutoff;
 }
 
-async function fetchRSSAsJSON(sourceKey) {
-  const s = feedsSources[sourceKey];
-  const res = await fetch(s.url, {
+async function fetchRSSAsJSON(source) {
+  const res = await fetch(source.url, {
     headers: {
       "Accept": "application/rss+xml, application/xml;q=0.9, text/xml;q=0.8, */*;q=0.7"
     }
   });
   if (!res.ok) {
-    throw new Error(`HTTP ${res.status} al leer ${s.url}`);
+    throw new Error(`HTTP ${res.status} al leer ${source.url}`);
   }
   const text = await res.text();
   const parser = new DOMParser();
@@ -277,7 +363,7 @@ async function fetchRSSAsJSON(sourceKey) {
     if (!withinWindow(dt || new Date())) {
       continue;
     }
-    const title = getText("title") || `${sourceKey} item`;
+    const title = getText("title") || `${source.id} item`;
     const desc = getText("description") || getText("summary") || "";
     const linkEl = item.querySelector("link");
     let link = "";
@@ -296,7 +382,7 @@ async function fetchRSSAsJSON(sourceKey) {
     }
 
     out.push({
-      source: sourceKey,
+      source: source.id,
       title: title.slice(0, 240),
       text: desc,
       link,
@@ -307,15 +393,14 @@ async function fetchRSSAsJSON(sourceKey) {
   return out;
 }
 
-async function fetchStocktwitsJSON() {
-  const s = feedsSources["stocktwits_amc"];
-  const res = await fetch(s.url, {
+async function fetchStocktwitsJSON(source) {
+  const res = await fetch(source.url, {
     headers: {
       "Accept": "application/json, */*;q=0.8"
     }
   });
   if (!res.ok) {
-    throw new Error(`HTTP ${res.status} al leer ${s.url}`);
+    throw new Error(`HTTP ${res.status} al leer ${source.url}`);
   }
   const data = await res.json();
   const msgs = Array.isArray(data.messages) ? data.messages : [];
@@ -324,12 +409,12 @@ async function fetchStocktwitsJSON() {
     const createdStr = m.created_at;
     const dt = parseDateFallback(createdStr);
     if (!withinWindow(dt || new Date())) continue;
-    const title = `Stocktwits #${m.id}`;
+    const title = `${source.label || "Stocktwits"} #${m.id}`;
     const text = (m.body || "").trim();
     const link = m.url || "";
     const user = m.user && m.user.username ? m.user.username : "";
     out.push({
-      source: "stocktwits_amc",
+      source: source.id,
       title,
       text,
       link,
@@ -340,25 +425,24 @@ async function fetchStocktwitsJSON() {
   return out;
 }
 
-async function collectAllSources() {
+async function collectAllSources(feeds) {
   const result = {};
-  for (const key of Object.keys(feedsSources)) {
-    const s = feedsSources[key];
+  for (const feed of feeds) {
     try {
-      if (s.type === "rss") {
-        result[key] = await fetchRSSAsJSON(key);
-      } else if (s.type === "stocktwits") {
-        result[key] = await fetchStocktwitsJSON(key);
+      if (feed.type === "rss") {
+        result[feed.id] = await fetchRSSAsJSON(feed);
+      } else if (feed.type === "stocktwits") {
+        result[feed.id] = await fetchStocktwitsJSON(feed);
       } else {
-        result[key] = [];
+        result[feed.id] = [];
       }
     } catch (err) {
-      console.error("Error en fuente", key, err);
-      result[key] = [{
-        source: key,
-        title: `[ERROR] ${s.label}`,
-        text: String(err),
-        link: s.url,
+      console.error("Error en fuente", feed.id, err);
+      result[feed.id] = [{
+        source: feed.id,
+        title: `[ERROR] ${feed.label}`,
+        text: String(err && err.message ? err.message : err),
+        link: feed.url,
         author: "",
         createdAt: new Date().toISOString()
       }];
@@ -383,7 +467,12 @@ async function handleDownloadUnified() {
   setFeedsStatus("Generando unified.json...", "");
   btnUnified.disabled = true;
   try {
-    const all = await collectAllSources();
+    const feeds = await getFeedsStorage();
+    if (!feeds.length) {
+      setFeedsStatus("No hay fuentes configuradas.", "error");
+      return;
+    }
+    const all = await collectAllSources(feeds);
     const unified = {
       generatedAt: new Date().toISOString(),
       sources: all
@@ -400,7 +489,7 @@ async function handleDownloadUnified() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  renderSourcesList();
+  loadFeeds();
   loadPrompts();
   btnUnified.addEventListener("click", handleDownloadUnified);
 });
