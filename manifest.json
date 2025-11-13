@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "Prompts + Feeds → JSON (Neo)",
+  "version": "1.6.0",
+  "description": "Gestor de prompts + unified.json de tus feeds AMC/BTC/BO con estética moderna.",
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Prompts + Feeds"
+  },
+  "icons": {
+    "128": "icon-128.png"
+  },
+  "permissions": [
+    "storage",
+    "clipboardWrite"
+  ],
+  "host_permissions": [
+    "https://rss.app/feeds/*",
+    "https://www.reddit.com/r/*",
+    "https://api.stocktwits.com/api/2/streams/symbol/AMC.json"
+  ]
+}

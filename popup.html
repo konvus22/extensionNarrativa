@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Prompts + Feeds</title>
+  <style>
+    :root {
+      --blue: #2563eb;
+      --text-main: #e5e7eb;
+      --text-soft: #9ca3af;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+      padding: 10px;
+      min-width: 360px;
+      min-height: 700px; /* popup más alto, casi doble */
+      color: var(--text-main);
+      background:
+        radial-gradient(circle at top left, #1d2a4a, #020617 55%),
+        radial-gradient(circle at bottom right, #0b1120, #020617 65%);
+    }
+    .shell {
+      border-radius: 18px;
+      padding: 10px 11px 12px;
+      background: radial-gradient(circle at top left, rgba(148,163,184,0.18), rgba(15,23,42,0.96));
+      border: 1px solid rgba(148,163,184,0.4);
+      box-shadow: 0 18px 40px rgba(15,23,42,0.65), 0 0 0 1px rgba(15,23,42,0.85);
+      backdrop-filter: blur(24px);
+    }
+    .header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    h1 {
+      font-size: 15px;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      letter-spacing: 0.03em;
+    }
+    .dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 999px;
+      background: var(--blue);
+      box-shadow: 0 0 0 3px rgba(37,99,235,0.35), 0 0 18px rgba(37,99,235,0.75);
+      flex-shrink: 0;
+    }
+    .badge {
+      font-size: 10px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(148,163,184,0.7);
+      color: var(--text-soft);
+      background: radial-gradient(circle at top left, rgba(148,163,184,0.25), transparent);
+    }
+    .subtitle {
+      font-size: 11px;
+      color: var(--text-soft);
+      margin-bottom: 8px;
+    }
+    .tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 8px;
+      padding: 3px;
+      background: radial-gradient(circle at top left, rgba(15,23,42,0.85), rgba(15,23,42,0.95));
+      border-radius: 999px;
+      border: 1px solid rgba(51,65,85,0.9);
+    }
+    .tab {
+      flex: 1;
+      text-align: center;
+      padding: 7px 0;
+      font-size: 12px;
+      border-radius: 999px;
+      cursor: pointer;
+      color: var(--text-soft);
+      user-select: none;
+      transition: all 0.18s ease;
+    }
+    .tab span { display:inline-flex; align-items:center; gap:4px; }
+    .tab.active {
+      background: radial-gradient(circle at top left, #3b82f6, #1d4ed8);
+      color: #f9fafb;
+      box-shadow: 0 0 0 1px rgba(37,99,235,0.4), 0 6px 14px rgba(37,99,235,0.55);
+    }
+    .panel { display:none; }
+    .panel.active { display:block; }
+
+    /* Editor de prompt plegable */
+    .prompt-editor {
+      border-radius: 14px;
+      border: 1px solid rgba(96,165,250,0.9);
+      box-shadow: 0 4px 14px rgba(15,23,42,0.8);
+      margin-bottom: 6px;
+      overflow: hidden;
+      background: radial-gradient(circle at top left, rgba(37,99,235,0.16), rgba(15,23,42,0.96));
+    }
+    .prompt-editor-header {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      padding:7px 9px;
+      cursor:pointer;
+      user-select:none;
+    }
+    .prompt-editor-title {
+      font-size:11px;
+      font-weight:600;
+      color:#bfdbfe;
+      display:flex;
+      align-items:center;
+      gap:6px;
+    }
+    .prompt-editor-title span {
+      font-size:10px;
+      font-weight:400;
+      color:var(--text-soft);
+    }
+    .chevron {
+      font-size:12px;
+      color:#bfdbfe;
+      transition:transform .16s ease;
+    }
+    .prompt-editor.collapsed .chevron {
+      transform:rotate(-90deg);
+    }
+    .prompt-editor-body {
+      padding:6px 9px 8px;
+      border-top:1px solid rgba(30,64,175,0.85);
+    }
+    .prompt-editor.collapsed .prompt-editor-body {
+      display:none;
+    }
+
+    .field-row {
+      display:flex;
+      gap:6px;
+      margin-bottom:6px;
+    }
+    .field-row input,
+    .field-row select,
+    .field-row textarea {
+      font-family:inherit;
+      font-size:11px;
+      color:var(--text-main);
+    }
+    input[type="text"], select {
+      padding:7px 11px;
+      border-radius:999px;
+      border:1px solid rgba(148,163,184,0.9);
+      flex:1;
+      background:rgba(15,23,42,0.9);
+      box-shadow:inset 0 0 0 1px rgba(15,23,42,0.9);
+    }
+    input::placeholder,
+    textarea::placeholder {
+      color:#94a3b8;
+    }
+    input:focus,
+    select:focus,
+    textarea:focus {
+      outline:none;
+      border-color:#93c5fd;
+      box-shadow:0 0 0 1px rgba(147,197,253,0.9),0 0 0 1px #020617;
+      background:rgba(15,23,42,1);
+    }
+    textarea {
+      width:100%;
+      min-height:78px;
+      border-radius:10px;
+      border:1px solid rgba(148,163,184,0.9);
+      padding:7px 9px;
+      resize:vertical;
+      background:rgba(15,23,42,0.98);
+      box-shadow:inset 0 0 0 1px rgba(15,23,42,1);
+      color:#e5e7eb;
+      line-height:1.4;
+    }
+    .prompt-editor-footer small {
+      font-size:10px;
+      color:#9ca3af;
+    }
+
+    button {
+      border:none;
+      cursor:pointer;
+      font-size:12px;
+      font-weight:500;
+    }
+    .btn-primary {
+      background:linear-gradient(135deg,#3b82f6,#1d4ed8);
+      color:#f9fafb;
+      padding:6px 14px;
+      border-radius:999px;
+      border:1px solid #60a5fa;
+      box-shadow:0 1px 4px rgba(15,23,42,0.4),0 0 0 1px rgba(15,23,42,0.9);
+      transition:transform .08s, box-shadow .08s, filter .08s;
+      white-space:nowrap;
+    }
+    .btn-primary:hover {
+      filter:brightness(1.05);
+      box-shadow:0 4px 10px rgba(37,99,235,0.7),0 0 0 1px rgba(15,23,42,0.9);
+    }
+    .btn-primary:active {
+      transform:translateY(1px) scale(.98);
+      box-shadow:0 0 0 rgba(37,99,235,0.6);
+    }
+    .btn-small { font-size:11px; }
+    .btn-outline-small {
+      padding:4px 8px;
+      border-radius:999px;
+      border:1px solid rgba(148,163,184,0.9);
+      background:rgba(15,23,42,0.9);
+      color:#e5e7eb;
+      font-size:10px;
+    }
+
+    .prompt-tools-row {
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:6px;
+      margin-top:4px;
+    }
+    .prompt-tools { display:flex; gap:4px; }
+
+    /* Filtro por categoría */
+    .filter-row {
+      display:flex;
+      gap:4px;
+      margin-top:6px;
+      margin-bottom:4px;
+      flex-wrap:wrap;
+    }
+    .filter-chip {
+      padding:3px 8px;
+      border-radius:999px;
+      border:1px solid rgba(148,163,184,0.7);
+      background:rgba(15,23,42,0.9);
+      color:#e5e7eb;
+      font-size:10px;
+      cursor:pointer;
+    }
+    .filter-chip.active {
+      background:#3b82f6;
+      border-color:#60a5fa;
+      color:#f9fafb;
+      box-shadow:0 0 0 1px rgba(15,23,42,0.9);
+    }
+
+    .prompt-list {
+      margin-top:6px;
+      padding-right:2px;
+    }
+    .prompt-item {
+      background:radial-gradient(circle at top left, rgba(37,99,235,0.09), rgba(15,23,42,0.96));
+      border-radius:14px;
+      border:1px solid rgba(51,65,85,0.9);
+      padding:8px 9px;
+      margin-bottom:6px;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:6px;
+      cursor:pointer;
+      transition:transform .08s, box-shadow .12s, border-color .12s, background .12s;
+    }
+    .prompt-item:hover {
+      transform:translateY(-1px);
+      box-shadow:0 5px 14px rgba(15,23,42,0.9);
+      border-color:rgba(96,165,250,0.9);
+      background:radial-gradient(circle at top left, rgba(37,99,235,0.16), rgba(15,23,42,0.98));
+    }
+    .prompt-main {
+      display:flex;
+      flex-direction:column;
+      gap:2px;
+      flex:1;
+      min-width:0;
+    }
+    .prompt-title {
+      font-size:12px;
+      font-weight:600;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    .prompt-meta { font-size:10px; color:var(--text-soft); }
+    .chips { display:flex; flex-wrap:wrap; gap:4px; margin-top:3px; }
+    .chip {
+      font-size:9px;
+      padding:2px 7px;
+      border-radius:999px;
+      background:rgba(37,99,235,0.12);
+      color:#bfdbfe;
+      border:1px solid rgba(59,130,246,0.45);
+    }
+    .prompt-actions {
+      display:flex;
+      flex-direction:column;
+      gap:3px;
+      align-items:flex-end;
+    }
+    .icon-btn {
+      background:radial-gradient(circle at top left, rgba(30,64,175,0.7), rgba(15,23,42,0.9));
+      border-radius:999px;
+      width:22px;
+      height:22px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:13px;
+      box-shadow:0 2px 6px rgba(15,23,42,0.9);
+      color:#e5e7eb;
+      border:1px solid rgba(148,163,184,0.7);
+    }
+
+    .status {
+      font-size:10px;
+      color:var(--text-soft);
+      min-height:12px;
+    }
+    .status.ok { color:#4ade80; }
+    .status.error { color:#f97373; }
+
+    .card {
+      background:radial-gradient(circle at top left, rgba(15,23,42,0.95), rgba(15,23,42,1));
+      border-radius:14px;
+      padding:8px;
+      box-shadow:0 4px 18px rgba(15,23,42,0.95);
+      margin-bottom:8px;
+      border:1px solid rgba(55,65,81,0.95);
+    }
+    .sources {
+      max-height:150px;
+      overflow-y:auto;
+      font-size:11px;
+    }
+    .source-item { margin-bottom:4px; }
+    .source-item strong { color:#e5e7eb; }
+    .source-item span   { color:#6b7280; }
+
+    .btn-full { width:100%; margin-top:7px; }
+    .btn-outline {
+      background:radial-gradient(circle at top left, rgba(15,23,42,0.96), rgba(15,23,42,1));
+      color:#dbeafe;
+      border-radius:999px;
+      border:1px solid rgba(96,165,250,0.9);
+      padding:8px 10px;
+      box-shadow:0 3px 10px rgba(37,99,235,0.6);
+      font-size:12px;
+    }
+
+    /* Editor de feeds (añadir / modificar / eliminar) */
+    .feeds-editor-title {
+      font-size:11px;
+      font-weight:600;
+      margin-bottom:4px;
+    }
+    .feeds-editor-row {
+      display:flex;
+      gap:4px;
+      margin-bottom:4px;
+    }
+    .feeds-editor-row input,
+    .feeds-editor-row select {
+      font-family:inherit;
+      font-size:10px;
+      padding:4px 6px;
+      border-radius:999px;
+      border:1px solid rgba(148,163,184,0.7);
+      background:rgba(15,23,42,0.9);
+      color:var(--text-main);
+      flex:1;
+    }
+
+    .github-title { font-size:11px; font-weight:600; margin-bottom:4px; }
+    .github-row { display:flex; gap:6px; margin-bottom:4px; }
+    .github-row input {
+      font-family:inherit; font-size:11px;
+      padding:6px 8px; border-radius:999px;
+      border:1px solid rgba(148,163,184,0.7);
+      background:rgba(15,23,42,0.9); color:var(--text-main);
+      flex:1;
+    }
+    .github-actions {
+      display:flex;
+      justify-content:space-between;
+      gap:6px;
+      margin-top:4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="header-row">
+      <h1><span class="dot"></span><span>Prompts + Feeds</span></h1>
+      <div class="badge">AMC · BTC · BO · 48h</div>
+    </div>
+    <div class="subtitle">Gestor de prompts + unified.json listo para que yo filtre lo importante según tu tesis.</div>
+
+    <div class="tabs">
+      <div class="tab active" data-tab="prompts"><span>✍️ Prompts</span></div>
+      <div class="tab" data-tab="feeds"><span>📡 Feeds → unified.json</span></div>
+    </div>
+
+    <!-- Panel PROMPTS -->
+    <div id="panel-prompts" class="panel active">
+      <div class="prompt-editor collapsed" id="promptEditor">
+        <div class="prompt-editor-header">
+          <div class="prompt-editor-title">
+            Contenido del prompt
+            <span>(clic para desplegar / ocultar)</span>
+          </div>
+          <div class="chevron">▾</div>
+        </div>
+        <div class="prompt-editor-body">
+          <div class="field-row">
+            <input id="promptTitle" type="text" placeholder="Título del prompt" />
+          </div>
+          <div class="field-row">
+            <select id="promptCategory">
+              <option value="Todas">Todas</option>
+              <option value="AMC">AMC</option>
+              <option value="BoxOffice">Box Office</option>
+              <option value="Otros">Otros</option>
+            </select>
+            <button id="savePrompt" class="btn-primary btn-small">Guardar</button>
+          </div>
+          <textarea id="promptContent" placeholder="Escribe aquí el contenido completo del prompt..."></textarea>
+          <div class="prompt-editor-footer">
+            <small>Consejo: guarda solo los prompts que realmente reutilices.</small>
+          </div>
+        </div>
+      </div>
+
+      <div class="prompt-tools-row">
+        <div class="status" id="promptStatus"></div>
+        <div class="prompt-tools">
+          <button id="exportPrompts" class="btn-outline-small">Exportar</button>
+          <button id="importPrompts" class="btn-outline-small">Importar</button>
+          <input id="importFile" type="file" accept="application/json" style="display:none" />
+        </div>
+      </div>
+
+      <!-- Filtros por categoría -->
+      <div class="filter-row">
+        <button class="filter-chip active" data-filter="Todas">Todas</button>
+        <button class="filter-chip" data-filter="AMC">AMC</button>
+        <button class="filter-chip" data-filter="BoxOffice">Box Office</button>
+        <button class="filter-chip" data-filter="Otros">Otros</button>
+      </div>
+
+      <div class="prompt-list" id="promptList"></div>
+    </div>
+
+    <!-- Panel FEEDS -->
+    <div id="panel-feeds" class="panel">
+      <div class="card">
+        <div class="sources" id="sourcesList"></div>
+      </div>
+
+      <div class="card">
+        <div class="feeds-editor-title">Feeds configurables</div>
+        <div id="feedsEditor"></div>
+        <button id="addFeed"  class="btn-outline-small" style="margin-top:6px">Añadir feed</button>
+        <button id="saveFeeds" class="btn-primary btn-small" style="margin-top:6px">Guardar feeds</button>
+        <div class="status" id="feedsConfigStatus"></div>
+      </div>
+
+      <button id="downloadUnified" class="btn-full btn-outline">⬇️ Descargar unified.json</button>
+      <div class="status" id="feedsStatus"></div>
+
+      <div class="card github-card">
+        <div class="github-title">GitHub (opcional)</div>
+        <div class="github-row">
+          <input id="ghOwner" placeholder="Owner (ej. tuusuario)" />
+          <input id="ghRepo"  placeholder="Repo (ej. feeds-narrativa)" />
+        </div>
+        <div class="github-row">
+          <input id="ghBranch"   placeholder="Branch (ej. main)" />
+          <input id="ghPathBase" placeholder="Carpeta (ej. data/unified)" />
+        </div>
+        <div class="github-row">
+          <input id="ghToken" type="password" placeholder="GitHub token (scope: repo)" />
+        </div>
+        <div class="github-actions">
+          <button id="saveGithub"   class="btn-outline-small">Guardar config</button>
+          <button id="uploadGithub" class="btn-primary btn-small">Subir unified.json a GitHub</button>
+        </div>
+        <div class="status" id="githubStatus"></div>
+      </div>
+    </div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
