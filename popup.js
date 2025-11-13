@@ -83,6 +83,9 @@ let editingId = null;
 let promptsCache = [];
 let promptEditorCollapsed = true;
 
+let editingId = null;
+let promptsCache = [];
+
 function setPromptStatus(msg, type = "") {
   promptStatusEl.textContent = msg || "";
   promptStatusEl.className = "status " + (type || "");
@@ -103,6 +106,18 @@ function setStorage(prompts) {
 async function loadPrompts() {
   promptsCache = await getStorage();
   renderPromptList();
+}
+
+function setPromptEditorCollapsed(collapsed) {
+  promptEditorCollapsed = collapsed;
+  if (!promptEditorEl || !togglePromptEditorBtn) return;
+  promptEditorEl.classList.toggle("collapsed", collapsed);
+  togglePromptEditorBtn.innerHTML = collapsed
+    ? "<span>▾</span><strong>Abrir</strong>"
+    : "<span>▴</span><strong>Cerrar</strong>";
+  togglePromptEditorBtn.setAttribute("aria-expanded", String(!collapsed));
+}
+
 }
 
 function setPromptEditorCollapsed(collapsed) {
@@ -319,6 +334,9 @@ let feedsCache = [];
 let editingFeedId = null;
 const GITHUB_SETTINGS_KEY = "githubSettings";
 
+let feedsCache = [];
+let editingFeedId = null;
+
 function setFeedsStatus(msg, type="") {
   feedsStatusEl.textContent = msg || "";
   feedsStatusEl.className = "status " + (type || "");
@@ -339,6 +357,88 @@ function getFeedsStorage() {
 
 function setFeedsStorage(feeds) {
   return writeKey(FEEDS_STORAGE_KEY, feeds);
+}
+
+async function loadFeeds() {
+  let feeds = await getFeedsStorage();
+  if (!feeds.length) {
+    feeds = defaultFeeds.map(f => ({ ...f }));
+    await setFeedsStorage(feeds);
+  }
+  feedsCache = feeds;
+  renderFeedList();
+}
+
+function renderFeedList() {
+  if (!feedsCache.length) {
+    feedListEl.innerHTML = '<div class="feed-empty">No hay fuentes configuradas.</div>';
+    return;
+  }
+  feedListEl.innerHTML = feedsCache.map(feed => `
+    <div class="feed-item" data-id="${feed.id}">
+      <div class="feed-info">
+        <div class="feed-title">${feed.label || "(sin nombre)"}</div>
+        <div class="feed-url" title="${feed.url}">${feed.url}</div>
+        <div class="feed-meta">Tipo: ${feed.type === "stocktwits" ? "Stocktwits" : "RSS"}</div>
+      </div>
+      <div class="feed-actions">
+        <button class="icon-btn edit-feed" title="Editar">✏️</button>
+        <button class="icon-btn delete-feed" title="Eliminar">🗑️</button>
+      </div>
+    </div>
+  `).join("");
+
+  feedListEl.querySelectorAll(".edit-feed").forEach(btn => {
+    btn.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      const id = ev.currentTarget.closest(".feed-item").dataset.id;
+      startFeedEdit(id);
+    });
+  });
+
+  feedListEl.querySelectorAll(".delete-feed").forEach(btn => {
+    btn.addEventListener("click", async (ev) => {
+      ev.stopPropagation();
+      const id = ev.currentTarget.closest(".feed-item").dataset.id;
+      feedsCache = feedsCache.filter(feed => feed.id !== id);
+      await setFeedsStorage(feedsCache);
+      renderFeedList();
+      if (editingFeedId === id) {
+        resetFeedForm();
+      }
+      setFeedFormStatus("Fuente eliminada.", "ok");
+    });
+  });
+}
+
+function startFeedEdit(id) {
+  const feed = feedsCache.find(f => f.id === id);
+  if (!feed) return;
+  editingFeedId = id;
+  feedLabelEl.value = feed.label || "";
+  feedUrlEl.value = feed.url || "";
+  feedTypeEl.value = feed.type || "rss";
+  setFeedFormStatus("Editando fuente...", "");
+}
+
+}
+
+function generateFeedId() {
+  return "feed_" + Date.now() + "_" + Math.floor(Math.random() * 1e6);
+}
+
+function getFeedsStorage() {
+  return new Promise(resolve => {
+    chrome.storage.local.get([FEEDS_STORAGE_KEY], data => {
+      resolve(data[FEEDS_STORAGE_KEY] || []);
+    });
+  });
+}
+
+function setFeedsStorage(feeds) {
+  return new Promise(resolve => {
+    chrome.storage.local.set({ [FEEDS_STORAGE_KEY]: feeds }, () => resolve());
+  });
 }
 
 async function loadFeeds() {
@@ -622,6 +722,18 @@ async function getGithubSettings() {
 
 function setGithubSettings(settings) {
   return writeKey(GITHUB_SETTINGS_KEY, sanitizeGithubSettings(settings));
+function getGithubSettings() {
+  return new Promise(resolve => {
+    chrome.storage.local.get([GITHUB_SETTINGS_KEY], data => {
+      resolve(sanitizeGithubSettings(data[GITHUB_SETTINGS_KEY] || {}));
+    });
+  });
+}
+
+function setGithubSettings(settings) {
+  return new Promise(resolve => {
+    chrome.storage.local.set({ [GITHUB_SETTINGS_KEY]: sanitizeGithubSettings(settings) }, () => resolve());
+  });
 }
 
 async function handleSaveGithubSettings() {
@@ -727,6 +839,7 @@ async function handleDownloadUnified() {
 
 document.addEventListener("DOMContentLoaded", async () => {
   setPromptEditorCollapsed(true);
+document.addEventListener("DOMContentLoaded", () => {
   loadFeeds();
   loadPrompts();
   if (btnUnified) {
