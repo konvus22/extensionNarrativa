@@ -17,6 +17,7 @@
   "host_permissions": [
     "https://rss.app/feeds/*",
     "https://www.reddit.com/r/*",
-    "https://api.stocktwits.com/api/2/streams/symbol/AMC.json"
+    "https://api.stocktwits.com/api/2/streams/symbol/AMC.json",
+    "https://api.github.com/*"
   ]
 }
