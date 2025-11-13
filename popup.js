@@ -25,6 +25,15 @@ const savePromptBtn = document.getElementById("savePrompt");
 const promptStatusEl = document.getElementById("promptStatus");
 const promptListEl = document.getElementById("promptList");
 const promptFilterEl = document.getElementById("promptFilter");
+const promptEditorEl = document.getElementById("promptEditor");
+const togglePromptEditorBtn = document.getElementById("togglePromptEditor");
+const exportPromptsBtn = document.getElementById("exportPrompts");
+const importPromptsBtn = document.getElementById("importPrompts");
+const importPromptsFileInput = document.getElementById("importPromptsFile");
+
+let editingId = null;
+let promptsCache = [];
+let promptEditorCollapsed = true;
 
 let editingId = null;
 let promptsCache = [];
@@ -55,6 +64,16 @@ function setStorage(prompts) {
 async function loadPrompts() {
   promptsCache = await getStorage();
   renderPromptList();
+}
+
+function setPromptEditorCollapsed(collapsed) {
+  promptEditorCollapsed = collapsed;
+  if (!promptEditorEl || !togglePromptEditorBtn) return;
+  promptEditorEl.classList.toggle("collapsed", collapsed);
+  togglePromptEditorBtn.innerHTML = collapsed
+    ? "<span>▾</span><strong>Abrir</strong>"
+    : "<span>▴</span><strong>Cerrar</strong>";
+  togglePromptEditorBtn.setAttribute("aria-expanded", String(!collapsed));
 }
 
 function renderPromptList() {
@@ -163,6 +182,65 @@ if (promptFilterEl) {
   promptFilterEl.addEventListener("change", renderPromptList);
 }
 
+if (togglePromptEditorBtn) {
+  togglePromptEditorBtn.addEventListener("click", () => {
+    setPromptEditorCollapsed(!promptEditorCollapsed);
+  });
+}
+
+if (exportPromptsBtn) {
+  exportPromptsBtn.addEventListener("click", async () => {
+    const prompts = await getStorage();
+    if (!prompts.length) {
+      setPromptStatus("No hay prompts para exportar.", "error");
+      return;
+    }
+    const payload = JSON.stringify(prompts, null, 2);
+    downloadBlob("prompts-backup.json", payload);
+    setPromptStatus("Prompts exportados.", "ok");
+  });
+}
+
+async function handlePromptsImport(file) {
+  if (!file) return;
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text);
+    if (!Array.isArray(data)) throw new Error("JSON inválido");
+    let prompts = await getStorage();
+    let importedCount = 0;
+    for (const item of data) {
+      const content = typeof item.content === "string" ? item.content.trim() : "";
+      if (!content) continue;
+      const title = typeof item.title === "string" ? item.title : "";
+      const category = typeof item.category === "string" ? item.category : "AMC";
+      let id = typeof item.id === "string" && item.id ? item.id : generateId();
+      if (prompts.some(p => p.id === id)) {
+        id = generateId();
+      }
+      prompts.push({ id, title, category, content });
+      importedCount++;
+    }
+    if (!importedCount) throw new Error("No se encontraron prompts válidos.");
+    promptsCache = prompts;
+    await setStorage(promptsCache);
+    renderPromptList();
+    setPromptStatus(`Se importaron ${importedCount} prompts.`, "ok");
+  } catch (err) {
+    console.error(err);
+    setPromptStatus("Error importando: " + err.message, "error");
+  }
+}
+
+if (importPromptsBtn && importPromptsFileInput) {
+  importPromptsBtn.addEventListener("click", () => importPromptsFileInput.click());
+  importPromptsFileInput.addEventListener("change", async (ev) => {
+    const file = ev.target.files && ev.target.files[0];
+    await handlePromptsImport(file);
+    importPromptsFileInput.value = "";
+  });
+}
+
 // ---- Feeds → unified.json ----
 const HOURS_WINDOW = 48;
 const defaultFeeds = [
@@ -190,6 +268,17 @@ const feedFormStatusEl = document.getElementById("feedFormStatus");
 const feedListEl = document.getElementById("feedList");
 const feedsStatusEl = document.getElementById("feedsStatus");
 const btnUnified = document.getElementById("downloadUnified");
+const githubRepoEl = document.getElementById("githubRepo");
+const githubBranchEl = document.getElementById("githubBranch");
+const githubPathEl = document.getElementById("githubPath");
+const githubTokenEl = document.getElementById("githubToken");
+const githubStatusEl = document.getElementById("githubStatus");
+const saveGithubBtn = document.getElementById("saveGithubSettings");
+const uploadGithubBtn = document.getElementById("uploadGithub");
+
+let feedsCache = [];
+let editingFeedId = null;
+const GITHUB_SETTINGS_KEY = "githubSettings";
 
 let feedsCache = [];
 let editingFeedId = null;
@@ -463,6 +552,129 @@ function downloadBlob(filename, dataStr) {
   URL.revokeObjectURL(url);
 }
 
+function setGithubStatus(msg, type = "") {
+  if (!githubStatusEl) return;
+  githubStatusEl.textContent = msg || "";
+  githubStatusEl.className = "status " + (type || "");
+}
+
+function sanitizeGithubSettings(raw = {}) {
+  return {
+    repo: (raw.repo || "").trim(),
+    branch: (raw.branch || "main").trim() || "main",
+    path: (raw.path || "unified.json").trim() || "unified.json",
+    token: (raw.token || "").trim()
+  };
+}
+
+function applyGithubSettings(settings) {
+  if (!settings) return;
+  const safe = sanitizeGithubSettings(settings);
+  if (githubRepoEl) githubRepoEl.value = safe.repo;
+  if (githubBranchEl) githubBranchEl.value = safe.branch;
+  if (githubPathEl) githubPathEl.value = safe.path;
+  if (githubTokenEl) githubTokenEl.value = safe.token;
+}
+
+function readGithubForm() {
+  return sanitizeGithubSettings({
+    repo: githubRepoEl ? githubRepoEl.value : "",
+    branch: githubBranchEl ? githubBranchEl.value : "",
+    path: githubPathEl ? githubPathEl.value : "",
+    token: githubTokenEl ? githubTokenEl.value : ""
+  });
+}
+
+function getGithubSettings() {
+  return new Promise(resolve => {
+    chrome.storage.local.get([GITHUB_SETTINGS_KEY], data => {
+      resolve(sanitizeGithubSettings(data[GITHUB_SETTINGS_KEY] || {}));
+    });
+  });
+}
+
+function setGithubSettings(settings) {
+  return new Promise(resolve => {
+    chrome.storage.local.set({ [GITHUB_SETTINGS_KEY]: sanitizeGithubSettings(settings) }, () => resolve());
+  });
+}
+
+async function handleSaveGithubSettings() {
+  const payload = readGithubForm();
+  await setGithubSettings(payload);
+  setGithubStatus("Datos guardados.", "ok");
+}
+
+function encodePath(path) {
+  return path.split("/").map(encodeURIComponent).join("/");
+}
+
+async function uploadUnifiedToGithub() {
+  if (!uploadGithubBtn) return;
+  const settings = readGithubForm();
+  if (!settings.repo || !settings.repo.includes("/")) {
+    setGithubStatus("Repo inválido. Usa owner/repo.", "error");
+    return;
+  }
+  if (!settings.token) {
+    setGithubStatus("Necesitas un token personal.", "error");
+    return;
+  }
+  setGithubStatus("Generando y subiendo unified.json...", "");
+  uploadGithubBtn.disabled = true;
+  try {
+    const feeds = await getFeedsStorage();
+    if (!feeds.length) {
+      throw new Error("Configura al menos una fuente.");
+    }
+    const all = await collectAllSources(feeds);
+    const unified = {
+      generatedAt: new Date().toISOString(),
+      sources: all
+    };
+    const payload = JSON.stringify(unified, null, 2);
+    const base64 = btoa(unescape(encodeURIComponent(payload)));
+    const [owner, repo] = settings.repo.split("/");
+    const pathEncoded = encodePath(settings.path);
+    const baseUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${pathEncoded}`;
+    const headers = {
+      "Authorization": `Bearer ${settings.token}`,
+      "Accept": "application/vnd.github+json"
+    };
+    let sha = null;
+    const checkRes = await fetch(`${baseUrl}?ref=${encodeURIComponent(settings.branch)}`, { headers });
+    if (checkRes.status === 200) {
+      const data = await checkRes.json();
+      sha = data.sha;
+    } else if (checkRes.status !== 404) {
+      const text = await checkRes.text();
+      throw new Error(`GitHub respondió ${checkRes.status}: ${text}`);
+    }
+    const body = {
+      message: `chore: update unified.json (${new Date().toISOString()})`,
+      content: base64,
+      branch: settings.branch,
+      committer: { name: "Prompts Extension", email: "bot@local" }
+    };
+    if (sha) body.sha = sha;
+    const putRes = await fetch(baseUrl, {
+      method: "PUT",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    if (!putRes.ok) {
+      const text = await putRes.text();
+      throw new Error(`GitHub respondió ${putRes.status}: ${text}`);
+    }
+    setGithubStatus("unified.json subido a GitHub.", "ok");
+  } catch (err) {
+    console.error(err);
+    setGithubStatus("Error subiendo: " + err.message, "error");
+  } finally {
+    uploadGithubBtn.disabled = false;
+  }
+}
+
 async function handleDownloadUnified() {
   setFeedsStatus("Generando unified.json...", "");
   btnUnified.disabled = true;
@@ -488,8 +700,22 @@ async function handleDownloadUnified() {
   }
 }
 
+document.addEventListener("DOMContentLoaded", async () => {
+  setPromptEditorCollapsed(true);
 document.addEventListener("DOMContentLoaded", () => {
   loadFeeds();
   loadPrompts();
-  btnUnified.addEventListener("click", handleDownloadUnified);
+  if (btnUnified) {
+    btnUnified.addEventListener("click", handleDownloadUnified);
+  }
+  if (saveGithubBtn) {
+    saveGithubBtn.addEventListener("click", handleSaveGithubSettings);
+  }
+  if (uploadGithubBtn) {
+    uploadGithubBtn.addEventListener("click", uploadUnifiedToGithub);
+  }
+  if (githubRepoEl) {
+    const ghSettings = await getGithubSettings();
+    applyGithubSettings(ghSettings);
+  }
 });

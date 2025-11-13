@@ -115,6 +115,7 @@
       padding: 8px 9px;
       box-shadow: 0 4px 14px rgba(15,23,42,0.8);
       margin-bottom: 6px;
+      transition: border-color 0.2s ease, background 0.2s ease;
     }
     .prompt-editor-title {
       font-size: 11px;
@@ -125,6 +126,29 @@
       align-items: center;
       gap: 6px;
     }
+    .prompt-editor.collapsed {
+      border-color: rgba(59,130,246,0.45);
+      background: radial-gradient(circle at top left, rgba(37,99,235,0.08), rgba(15,23,42,0.94));
+    }
+    .prompt-editor.collapsed .prompt-editor-body { display: none; }
+    .prompt-editor-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .collapse-toggle {
+      background: transparent;
+      border: 1px solid rgba(147,197,253,0.6);
+      color: #e0f2fe;
+      border-radius: 999px;
+      padding: 2px 10px;
+      font-size: 11px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .collapse-toggle span { font-size: 13px; }
     .prompt-editor-title span {
       font-size: 10px;
       font-weight: 400;
@@ -189,6 +213,16 @@
       align-items: center;
       gap: 8px;
       font-size: 11px;
+      color: #e2e8f0;
+      margin: 4px 0 8px;
+    }
+    .filter-row label { font-weight: 600; color: #e2e8f0; }
+    .filter-row select {
+      max-width: 170px;
+      color: #f8fafc;
+      background: rgba(15,23,42,0.95);
+      border-color: rgba(191,219,254,0.9);
+    }
       color: var(--text-soft);
       margin: 4px 0 8px;
     }
@@ -228,6 +262,17 @@
     .prompt-list {
       margin-top: 6px;
       padding-right: 2px;
+    }
+
+    .prompt-tools {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 6px;
+      flex-wrap: wrap;
+    }
+    .prompt-tools button {
+      flex: 1;
+      min-width: 120px;
     }
 
     .prompt-item {
@@ -399,6 +444,26 @@
       transform: translateY(1px) scale(0.985);
       box-shadow: 0 0 0 rgba(37,99,235,0.6);
     }
+    .github-card .field-row {
+      flex-wrap: wrap;
+    }
+    .github-card input[type="password"] {
+      letter-spacing: 0.1em;
+    }
+    .github-card small {
+      color: #94a3b8;
+      font-size: 10px;
+    }
+    .github-card .btn-row {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-top: 6px;
+    }
+    .github-card .btn-row button {
+      flex: 1;
+      min-width: 130px;
+    }
   </style>
 </head>
 <body>
@@ -415,29 +480,39 @@
     </div>
 
     <div id="panel-prompts" class="panel active">
-      <div class="prompt-editor">
-        <div class="prompt-editor-title">
-          Contenido del prompt
-          <span>(se copia al pulsar en la tarjeta inferior)</span>
+      <div class="prompt-editor collapsed" id="promptEditor">
+        <div class="prompt-editor-header">
+          <div class="prompt-editor-title">
+            Contenido del prompt
+            <span>(se copia al pulsar en la tarjeta inferior)</span>
+          </div>
+          <button id="togglePromptEditor" class="collapse-toggle"><span>▾</span><strong>Abrir</strong></button>
         </div>
-        <div class="field-row">
-          <input id="promptTitle" type="text" placeholder="Título del prompt" />
-        </div>
-        <div class="field-row">
-          <select id="promptCategory">
-            <option value="AMC">AMC</option>
-            <option value="BoxOffice">Box Office</option>
-            <option value="Otros">Otros</option>
-            <option value="Todas">Todas</option>
-          </select>
-          <button id="savePrompt" class="btn-primary btn-small">Guardar</button>
-        </div>
-        <textarea id="promptContent" placeholder="Escribe aquí el contenido completo del prompt..."></textarea>
-        <div class="prompt-editor-footer">
-          <small>Consejo: guarda solo los prompts que realmente reutilices.</small>
+        <div class="prompt-editor-body">
+          <div class="field-row">
+            <input id="promptTitle" type="text" placeholder="Título del prompt" />
+          </div>
+          <div class="field-row">
+            <select id="promptCategory">
+              <option value="AMC">AMC</option>
+              <option value="BoxOffice">Box Office</option>
+              <option value="Otros">Otros</option>
+              <option value="Todas">Todas</option>
+            </select>
+            <button id="savePrompt" class="btn-primary btn-small">Guardar</button>
+          </div>
+          <textarea id="promptContent" placeholder="Escribe aquí el contenido completo del prompt..."></textarea>
+          <div class="prompt-editor-footer">
+            <small>Consejo: guarda solo los prompts que realmente reutilices.</small>
+          </div>
         </div>
       </div>
       <div class="status" id="promptStatus"></div>
+      <div class="prompt-tools">
+        <button id="exportPrompts" class="btn-primary btn-small">⬇️ Exportar prompts</button>
+        <button id="importPrompts" class="btn-outline btn-small">⬆️ Importar prompts</button>
+        <input type="file" id="importPromptsFile" accept="application/json" style="display:none" />
+      </div>
       <div class="filter-row">
         <label for="promptFilter">Filtrar por categoría:</label>
         <select id="promptFilter">
@@ -473,6 +548,23 @@
       </div>
       <button id="downloadUnified" class="btn-full btn-outline">⬇️ Descargar unified.json</button>
       <div class="status" id="feedsStatus"></div>
+      <div class="card github-card">
+        <div class="prompt-editor-title">Subir unified.json a GitHub</div>
+        <div class="field-row">
+          <input id="githubRepo" type="text" placeholder="owner/repo" />
+          <input id="githubBranch" type="text" placeholder="Rama" value="main" />
+        </div>
+        <div class="field-row">
+          <input id="githubPath" type="text" placeholder="ruta/unified.json" value="unified.json" />
+          <input id="githubToken" type="password" placeholder="Token personal" />
+        </div>
+        <small>El token debe tener permisos repo (contenido). Los datos se guardan solo en este navegador.</small>
+        <div class="btn-row">
+          <button id="saveGithubSettings" class="btn-primary btn-small">Guardar datos</button>
+          <button id="uploadGithub" class="btn-outline btn-small">⬆️ Subir unified.json</button>
+        </div>
+        <div class="status" id="githubStatus"></div>
+      </div>
     </div>
   </div>
   <script src="popup.js"></script>
