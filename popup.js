@@ -35,6 +35,9 @@ let editingId = null;
 let promptsCache = [];
 let promptEditorCollapsed = true;
 
+let editingId = null;
+let promptsCache = [];
+
 function setPromptStatus(msg, type = "") {
   promptStatusEl.textContent = msg || "";
   promptStatusEl.className = "status " + (type || "");
@@ -276,6 +279,9 @@ const uploadGithubBtn = document.getElementById("uploadGithub");
 let feedsCache = [];
 let editingFeedId = null;
 const GITHUB_SETTINGS_KEY = "githubSettings";
+
+let feedsCache = [];
+let editingFeedId = null;
 
 function setFeedsStatus(msg, type="") {
   feedsStatusEl.textContent = msg || "";
@@ -696,6 +702,7 @@ async function handleDownloadUnified() {
 
 document.addEventListener("DOMContentLoaded", async () => {
   setPromptEditorCollapsed(true);
+document.addEventListener("DOMContentLoaded", () => {
   loadFeeds();
   loadPrompts();
   if (btnUnified) {
